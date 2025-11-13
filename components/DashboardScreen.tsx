@@ -25,6 +25,15 @@ interface DashboardScreenProps {
 const DashboardScreen: React.FC<DashboardScreenProps> = ({ products, transactions }) => {
     const totalProducts = products.length;
     const lowStockItems = products.filter(p => p.quantity <= p.lowStockThreshold).length;
+    // Near expiry: products with an expiryDate within the next X days
+    const EXPIRY_THRESHOLD_DAYS = 7;
+    const nearExpiryItems = products.filter(p => {
+        if (!p.expiryDate) return false;
+        const d = new Date(p.expiryDate);
+        const diffMs = d.getTime() - Date.now();
+        const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+        return diffDays >= 0 && diffDays <= EXPIRY_THRESHOLD_DAYS;
+    }).length;
     const totalRevenue = transactions.reduce((sum, t) => sum + t.total, 0);
     const totalSales = transactions.length;
 
@@ -43,7 +52,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ products, transaction
 
     return (
         <div className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
                 <StatCard 
                     title="Total Sales (Rs)" 
                     value={`Rs ${totalRevenue.toFixed(2)}`} 
@@ -67,6 +76,12 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ products, transaction
                     value={lowStockItems} 
                     icon={<AlertTriangleIcon className="w-6 h-6 text-white"/>} 
                     color={lowStockItems > 0 ? "bg-red-500" : "bg-yellow-500"}
+                />
+                <StatCard
+                    title={`Near Expiry (${EXPIRY_THRESHOLD_DAYS}d)`}
+                    value={nearExpiryItems}
+                    icon={<PackageIcon className="w-6 h-6 text-white"/>}
+                    color={nearExpiryItems > 0 ? 'bg-red-500' : 'bg-green-400'}
                 />
             </div>
 

@@ -32,6 +32,8 @@ export interface Product {
   price: number;
   quantity: number;
   lowStockThreshold: number;
+  // Optional ISO date string for product expiry. Not all deployments may have this column in Supabase.
+  expiryDate?: string | null;
 }
 
 export interface CartItem {

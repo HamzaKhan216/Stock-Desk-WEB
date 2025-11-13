@@ -45,6 +45,7 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [currentView, setCurrentView] = useState<View>('Dashboard');
   const [products, setProducts] = useState<Product[]>([]);
+  const [supportsExpiry, setSupportsExpiry] = useState<boolean>(true);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [theme, setTheme] = useState<Theme>('dark');
@@ -67,7 +68,28 @@ const App: React.FC = () => {
         .from('products')
         .select('*');
       if(productsError) console.error("Error fetching products:", productsError);
-      else setProducts(productsData.map(p => ({...p, costPrice: p.cost_price, lowStockThreshold: p.low_stock_threshold})));
+      else {
+        try {
+          // Determine whether the products table returns an expiry column
+          const supports = Array.isArray(productsData) && productsData.length > 0 && (('expiry_date' in productsData[0]) || ('expiryDate' in productsData[0]));
+          setSupportsExpiry(Boolean(supports));
+
+          // Merge any locally stored expiry dates when the DB doesn't have the column
+          const localExpiryMap = JSON.parse(localStorage.getItem('expiry_dates') || '{}');
+
+          const mapped = productsData.map((p: any) => ({
+            ...p,
+            costPrice: p.cost_price,
+            lowStockThreshold: p.low_stock_threshold,
+            expiryDate: p.expiry_date || p.expiryDate || localExpiryMap[p.sku] || null
+          }));
+
+          setProducts(mapped);
+        } catch (e) {
+          console.error('Error processing productsData', e);
+          setProducts(productsData.map((p: any) => ({...p, costPrice: p.cost_price, lowStockThreshold: p.low_stock_threshold})));
+        }
+      }
       
       const { data: transactionsData, error: transactionsError } = await supabase
         .from('transactions')
@@ -231,25 +253,44 @@ const App: React.FC = () => {
   
   const handleProductUpdate = async (updatedProduct: Product) => {
     if(!session) return;
-    const { error } = await supabase.from('products').update({
-        name: updatedProduct.name,
-        cost_price: updatedProduct.costPrice,
-        price: updatedProduct.price,
-        quantity: updatedProduct.quantity,
-        low_stock_threshold: updatedProduct.lowStockThreshold
-    }).match({ sku: updatedProduct.sku, user_id: session.user.id });
+  const toUpdate: any = {
+    name: updatedProduct.name,
+    cost_price: updatedProduct.costPrice,
+    price: updatedProduct.price,
+    quantity: updatedProduct.quantity,
+    low_stock_threshold: updatedProduct.lowStockThreshold
+  };
+
+  if (supportsExpiry) {
+    toUpdate.expiry_date = updatedProduct.expiryDate || null;
+  }
+
+  const { error } = await supabase.from('products').update(toUpdate).match({ sku: updatedProduct.sku, user_id: session.user.id });
 
     if(error) {
         console.error("Error updating product:", error.message);
         alert(`Failed to update product: ${error.message}`);
     }
     else await fetchData();
+
+    // If DB does not support expiry column, persist it locally so it survives reloads on this browser
+    if (!supportsExpiry) {
+      try {
+        const map = JSON.parse(localStorage.getItem('expiry_dates') || '{}');
+        if (updatedProduct.expiryDate) map[updatedProduct.sku] = updatedProduct.expiryDate;
+        else delete map[updatedProduct.sku];
+        localStorage.setItem('expiry_dates', JSON.stringify(map));
+        setProducts(prev => prev.map(p => p.sku === updatedProduct.sku ? {...updatedProduct} : p));
+      } catch (e) {
+        console.error('Failed to persist expiry locally', e);
+      }
+    }
   };
   
   const handleProductAdd = async (newProduct: Product) => {
     if(!session) return;
     
-    const { error } = await supabase.from('products').insert({
+    const insertObj: any = {
       sku: newProduct.sku,
       user_id: session.user.id,
       name: newProduct.name,
@@ -257,7 +298,10 @@ const App: React.FC = () => {
       price: newProduct.price,
       quantity: newProduct.quantity,
       low_stock_threshold: newProduct.lowStockThreshold,
-    });
+    };
+    if (supportsExpiry) insertObj.expiry_date = newProduct.expiryDate || null;
+
+    const { error } = await supabase.from('products').insert(insertObj);
 
     if(error) {
         console.error("Error adding product:", error.message);
@@ -268,6 +312,17 @@ const App: React.FC = () => {
         }
     } else {
         await fetchData();
+    }
+
+    // If DB doesn't support expiry, save it in localStorage as a fallback
+    if (!supportsExpiry && newProduct.expiryDate) {
+      try {
+        const map = JSON.parse(localStorage.getItem('expiry_dates') || '{}');
+        map[newProduct.sku] = newProduct.expiryDate;
+        localStorage.setItem('expiry_dates', JSON.stringify(map));
+      } catch (e) {
+        console.error('Failed to persist expiry locally', e);
+      }
     }
   };
   
@@ -280,6 +335,16 @@ const App: React.FC = () => {
         alert(`Failed to delete product: ${error.message}`);
     }
     else await fetchData();
+    // Clean local expiry cache when product deleted
+    try {
+      const map = JSON.parse(localStorage.getItem('expiry_dates') || '{}');
+      if (map[sku]) {
+        delete map[sku];
+        localStorage.setItem('expiry_dates', JSON.stringify(map));
+      }
+    } catch (e) {
+      // ignore
+    }
   };
   
   const handleSignOut = async () => {

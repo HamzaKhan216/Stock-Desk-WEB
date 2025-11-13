@@ -11,14 +11,15 @@ interface ProductsScreenProps {
 }
 
 const ProductForm: React.FC<{product?: Product | null; onSave: (product: Product) => void; onCancel: () => void;}> = ({ product, onSave, onCancel }) => {
-    const [formData, setFormData] = useState<Omit<Product, 'sku'> & { sku?: string }>({
+  const [formData, setFormData] = useState<Omit<Product, 'sku'> & { sku?: string }>({
         sku: product?.sku || '',
         user_id: product?.user_id || '',
         name: product?.name || '',
         costPrice: product?.costPrice || 0,
         price: product?.price || 0,
         quantity: product?.quantity || 0,
-        lowStockThreshold: product?.lowStockThreshold || 10,
+    lowStockThreshold: product?.lowStockThreshold || 10,
+    expiryDate: product?.expiryDate || ''
     });
     
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -65,6 +66,10 @@ const ProductForm: React.FC<{product?: Product | null; onSave: (product: Product
                     <label htmlFor="lowStockThreshold" className={labelClasses}>Low Stock Threshold</label>
                     <input type="number" name="lowStockThreshold" value={formData.lowStockThreshold} onChange={handleChange} min="0" required className={inputClasses}/>
                 </div>
+        <div>
+          <label htmlFor="expiryDate" className={labelClasses}>Expiry Date</label>
+          <input type="date" name="expiryDate" value={formData.expiryDate ? String(formData.expiryDate).slice(0,10) : ''} onChange={handleChange} className={inputClasses} />
+        </div>
             </div>
             <div className="flex justify-end space-x-2 pt-4">
                 <button type="button" onClick={onCancel} className="px-4 py-2 rounded-md bg-gray-200 text-gray-800 dark:bg-gray-600 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-500 font-semibold">Cancel</button>
@@ -136,12 +141,16 @@ const ProductsScreen: React.FC<ProductsScreenProps> = ({ products, onAdd, onUpda
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Cost Price</th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Sale Price</th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Quantity</th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Expiry</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
             {filteredProducts.map(product => {
               const isLowStock = product.quantity <= product.lowStockThreshold;
+              const expiryDate = product.expiryDate ? new Date(product.expiryDate) : null;
+              const daysUntilExpiry = expiryDate ? Math.ceil((expiryDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
+              const isNearExpiry = daysUntilExpiry !== null && daysUntilExpiry <= 7 && daysUntilExpiry >= 0;
               return (
                 <tr key={product.sku} className={isLowStock ? 'bg-red-500/10' : ''}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-600 dark:text-gray-400">{product.sku}</td>
@@ -153,6 +162,10 @@ const ProductsScreen: React.FC<ProductsScreenProps> = ({ products, onAdd, onUpda
                       {product.quantity}
                       {isLowStock && <AlertTriangleIcon className="w-4 h-4 ml-2" title="Low stock" />}
                     </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <div className="text-sm text-gray-700 dark:text-gray-300">{expiryDate ? expiryDate.toLocaleDateString() : '-'}</div>
+                    {isNearExpiry && <div className="text-xs text-red-600 dark:text-red-400 font-semibold">{daysUntilExpiry} day(s) left</div>}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
                     <button onClick={() => openEditModal(product)} className="p-2 text-gray-500 hover:text-blue-600 dark:hover:text-blue-400"><PencilIcon className="w-4 h-4"/></button>
