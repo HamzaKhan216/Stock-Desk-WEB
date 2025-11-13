@@ -103,7 +103,7 @@ const BillingScreen: React.FC<BillingScreenProps> = ({ products, onCheckout }) =
             setStoreName(v);
             try { localStorage.setItem('storeName', v); } catch (e) {}
           }}
-          placeholder="Enter store name for receipt (centered)"
+          placeholder="Enter store name for receipt"
           className="w-full text-center text-2xl font-bold bg-transparent border-0 focus:outline-none text-gray-900 dark:text-gray-100"
         />
       </div>
