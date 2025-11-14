@@ -49,6 +49,9 @@ const App: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [theme, setTheme] = useState<Theme>('dark');
+  const [productPage, setProductPage] = useState(1);
+  const [totalProducts, setTotalProducts] = useState(0);
+  const PRODUCTS_PER_PAGE = 50;
   
   // If supabase is not configured, show instructions.
   if (!supabase) {
@@ -61,12 +64,18 @@ const App: React.FC = () => {
     root.classList.add(theme);
   }, [theme]);
 
-  const fetchData = async () => {
+  const fetchData = async (page: number = 1) => {
       if(!session) return;
       
-      const { data: productsData, error: productsError } = await supabase
+      const startIndex = (page - 1) * PRODUCTS_PER_PAGE;
+      const endIndex = startIndex + PRODUCTS_PER_PAGE - 1;
+      
+      const { data: productsData, error: productsError, count } = await supabase
         .from('products')
-        .select('*');
+        .select('*', { count: 'exact' })
+        .range(startIndex, endIndex)
+        .order('name', { ascending: true });
+      
       if(productsError) console.error("Error fetching products:", productsError);
       else {
         try {
@@ -85,9 +94,11 @@ const App: React.FC = () => {
           }));
 
           setProducts(mapped);
+          setTotalProducts(count || 0);
         } catch (e) {
           console.error('Error processing productsData', e);
           setProducts(productsData.map((p: any) => ({...p, costPrice: p.cost_price, lowStockThreshold: p.low_stock_threshold})));
+          setTotalProducts(count || 0);
         }
       }
       
@@ -137,9 +148,9 @@ const App: React.FC = () => {
   
   useEffect(() => {
     if(session) {
-      fetchData();
+      fetchData(productPage);
     }
-  }, [session]);
+  }, [session, productPage]);
 
 
   const handleViewChange = useCallback((view: View) => {
@@ -235,7 +246,7 @@ const App: React.FC = () => {
         }
     }
 
-    await fetchData();
+    await fetchData(productPage);
 
     const newTransaction: Transaction = {
       id: transactionData.id,
@@ -271,7 +282,7 @@ const App: React.FC = () => {
         console.error("Error updating product:", error.message);
         alert(`Failed to update product: ${error.message}`);
     }
-    else await fetchData();
+    else await fetchData(productPage);
 
     // If DB does not support expiry column, persist it locally so it survives reloads on this browser
     if (!supportsExpiry) {
@@ -311,7 +322,7 @@ const App: React.FC = () => {
           alert(`Failed to add product: ${error.message}`);
         }
     } else {
-        await fetchData();
+        await fetchData(productPage);
     }
 
     // If DB doesn't support expiry, save it in localStorage as a fallback
@@ -334,7 +345,7 @@ const App: React.FC = () => {
         console.error("Error deleting product:", error.message);
         alert(`Failed to delete product: ${error.message}`);
     }
-    else await fetchData();
+    else await fetchData(productPage);
     // Clean local expiry cache when product deleted
     try {
       const map = JSON.parse(localStorage.getItem('expiry_dates') || '{}');
@@ -366,6 +377,10 @@ const App: React.FC = () => {
                   onAdd={handleProductAdd} 
                   onUpdate={handleProductUpdate} 
                   onDelete={handleProductDelete}
+                  currentPage={productPage}
+                  onPageChange={setProductPage}
+                  totalProducts={totalProducts}
+                  itemsPerPage={PRODUCTS_PER_PAGE}
                 />;
       case 'Analytics':
         // FIX: Added the missing 'products' prop to the AnalyticsScreen component.

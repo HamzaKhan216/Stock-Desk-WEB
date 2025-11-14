@@ -8,6 +8,10 @@ interface ProductsScreenProps {
   onAdd: (newProduct: Product) => void;
   onUpdate: (updatedProduct: Product) => void;
   onDelete: (sku: string) => void;
+  currentPage: number;
+  onPageChange: (page: number) => void;
+  totalProducts: number;
+  itemsPerPage: number;
 }
 
 const ProductForm: React.FC<{product?: Product | null; onSave: (product: Product) => void; onCancel: () => void;}> = ({ product, onSave, onCancel }) => {
@@ -80,7 +84,7 @@ const ProductForm: React.FC<{product?: Product | null; onSave: (product: Product
 };
 
 
-const ProductsScreen: React.FC<ProductsScreenProps> = ({ products, onAdd, onUpdate, onDelete }) => {
+const ProductsScreen: React.FC<ProductsScreenProps> = ({ products, onAdd, onUpdate, onDelete, currentPage, onPageChange, totalProducts, itemsPerPage }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -177,6 +181,33 @@ const ProductsScreen: React.FC<ProductsScreenProps> = ({ products, onAdd, onUpda
           </tbody>
         </table>
       </div>
+
+      {/* Pagination Controls */}
+      <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="text-sm text-gray-600 dark:text-gray-400">
+          Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, totalProducts)} of {totalProducts} products
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => onPageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+            className="px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Previous
+          </button>
+          <span className="px-4 py-2 text-gray-700 dark:text-gray-300 font-medium">
+            Page {currentPage} of {Math.ceil(totalProducts / itemsPerPage)}
+          </span>
+          <button
+            onClick={() => onPageChange(currentPage + 1)}
+            disabled={currentPage >= Math.ceil(totalProducts / itemsPerPage)}
+            className="px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingProduct ? 'Edit Product' : 'Add New Product'} size="lg">
         <ProductForm product={editingProduct} onSave={handleSave} onCancel={() => setIsModalOpen(false)} />
       </Modal>
