@@ -115,7 +115,9 @@ const App: React.FC = () => {
             ...p,
             costPrice: p.cost_price,
             lowStockThreshold: p.low_stock_threshold,
-            expiryDate: p.expiry_date || p.expiryDate || localExpiryMap[p.sku] || null
+            expiryDate: p.expiry_date || p.expiryDate || localExpiryMap[p.sku] || null,
+            unitsPerItem: p.units_per_item || 1,
+            loosePricePerUnit: p.loose_price_per_unit || 0
           }));
 
           setProducts(mapped);
@@ -205,12 +207,30 @@ const App: React.FC = () => {
   const handleCheckout = async (cart: CartItem[], discountPercent: number, discountRs: number = 0, contactId?: string): Promise<Transaction | null> => {
     if (!session) return null;
 
+    // Validate stock for each cart item taking into account sale unit (box or loose)
     for (const item of cart) {
-        const product = products.find(p => p.sku === item.productSku);
-        if(!product || product.quantity < item.quantity) {
-            alert(`Not enough stock for ${item.name}.`);
-            return null;
-        }
+      const product = products.find(p => p.sku === item.productSku);
+      if (!product) {
+        alert(`Product not found for ${item.name}.`);
+        return null;
+      }
+
+      const unitsPer = (product as any).unitsPerItem || (product as any).units_per_item || 1;
+      let quantityToDeduct = 0;
+
+      if (item.sale_unit === 'loose') {
+        // item.quantity represents number of loose units sold
+        // Convert loose units to fraction of a pack
+        quantityToDeduct = item.quantity / unitsPer;
+      } else {
+        // Default / 'box' sale -> deduct whole packages
+        quantityToDeduct = item.quantity;
+      }
+
+      if (product.quantity < quantityToDeduct) {
+        alert(`Not enough stock for ${item.name}.`);
+        return null;
+      }
     }
 
   const subtotal = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
@@ -275,16 +295,22 @@ const App: React.FC = () => {
     }
 
     for (const item of cart) {
-        const product = products.find(p => p.sku === item.productSku)!;
-        const newQuantity = product.quantity - item.quantity;
-        const { error: updateError } = await supabase
-            .from('products')
-            .update({ quantity: newQuantity })
-            .match({ sku: item.productSku, user_id: session.user.id });
-        if (updateError) {
-            console.error(`Failed to update stock for ${item.productSku}:`, updateError.message);
-            alert(`Transaction complete, but failed to update stock for ${item.name}. Please manually adjust it.`);
-        }
+      const product = products.find(p => p.sku === item.productSku)!;
+      const unitsPer = (product as any).unitsPerItem || (product as any).units_per_item || 1;
+
+      const quantityToDeduct = item.sale_unit === 'loose'
+        ? (item.quantity / unitsPer)
+        : item.quantity;
+
+      const newQuantity = Number(product.quantity) - Number(quantityToDeduct);
+      const { error: updateError } = await supabase
+        .from('products')
+        .update({ quantity: newQuantity })
+        .match({ sku: item.productSku, user_id: session.user.id });
+      if (updateError) {
+        console.error(`Failed to update stock for ${item.productSku}:`, updateError.message);
+        alert(`Transaction complete, but failed to update stock for ${item.name}. Please manually adjust it.`);
+      }
     }
 
     await fetchData(productPage);
@@ -311,7 +337,9 @@ const App: React.FC = () => {
     cost_price: updatedProduct.costPrice,
     price: updatedProduct.price,
     quantity: updatedProduct.quantity,
-    low_stock_threshold: updatedProduct.lowStockThreshold
+    low_stock_threshold: updatedProduct.lowStockThreshold,
+    units_per_item: updatedProduct.unitsPerItem || 1,
+    loose_price_per_unit: updatedProduct.loosePricePerUnit || 0
   };
 
   if (supportsExpiry) {
@@ -354,6 +382,8 @@ const App: React.FC = () => {
       price: newProduct.price,
       quantity: newProduct.quantity,
       low_stock_threshold: newProduct.lowStockThreshold,
+      units_per_item: newProduct.unitsPerItem || 1,
+      loose_price_per_unit: newProduct.loosePricePerUnit || 0
     };
     if (supportsExpiry) insertObj.expiry_date = newProduct.expiryDate || null;
 

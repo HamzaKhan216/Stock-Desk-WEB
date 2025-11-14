@@ -23,7 +23,9 @@ const ProductForm: React.FC<{product?: Product | null; onSave: (product: Product
         price: product?.price || 0,
         quantity: product?.quantity || 0,
     lowStockThreshold: product?.lowStockThreshold || 10,
-    expiryDate: product?.expiryDate || ''
+    expiryDate: product?.expiryDate || '',
+    unitsPerItem: product?.unitsPerItem || 1,
+    loosePricePerUnit: product?.loosePricePerUnit || 0
     });
     
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -74,6 +76,14 @@ const ProductForm: React.FC<{product?: Product | null; onSave: (product: Product
           <label htmlFor="expiryDate" className={labelClasses}>Expiry Date</label>
           <input type="date" name="expiryDate" value={formData.expiryDate ? String(formData.expiryDate).slice(0,10) : ''} onChange={handleChange} className={inputClasses} />
         </div>
+                <div>
+                  <label htmlFor="unitsPerItem" className={labelClasses}>Units Per Item (Packing)</label>
+                  <input type="number" name="unitsPerItem" value={formData.unitsPerItem} onChange={handleChange} min="1" step="1" required className={inputClasses}/>
+                </div>
+                <div>
+                  <label htmlFor="loosePricePerUnit" className={labelClasses}>Loose Price Per Unit (Rs)</label>
+                  <input type="number" name="loosePricePerUnit" value={formData.loosePricePerUnit} onChange={handleChange} step="0.01" min="0" required className={inputClasses}/>
+                </div>
             </div>
             <div className="flex justify-end space-x-2 pt-4">
                 <button type="button" onClick={onCancel} className="px-4 py-2 rounded-md bg-gray-200 text-gray-800 dark:bg-gray-600 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-500 font-semibold">Cancel</button>
@@ -145,7 +155,10 @@ const ProductsScreen: React.FC<ProductsScreenProps> = ({ products, onAdd, onUpda
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Cost Price</th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Sale Price</th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Quantity</th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Packing</th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Loose Price</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Expiry</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
@@ -167,10 +180,13 @@ const ProductsScreen: React.FC<ProductsScreenProps> = ({ products, onAdd, onUpda
                       {isLowStock && <AlertTriangleIcon className="w-4 h-4 ml-2" title="Low stock" />}
                     </div>
                   </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{product.unitsPerItem || 1} units/box</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">Rs {(product.loosePricePerUnit || 0).toFixed(2)}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     <div className="text-sm text-gray-700 dark:text-gray-300">{expiryDate ? expiryDate.toLocaleDateString() : '-'}</div>
                     {isNearExpiry && <div className="text-xs text-red-600 dark:text-red-400 font-semibold">{daysUntilExpiry} day(s) left</div>}
                   </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{product.unitsPerItem || 1}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
                     <button onClick={() => openEditModal(product)} className="p-2 text-gray-500 hover:text-blue-600 dark:hover:text-blue-400"><PencilIcon className="w-4 h-4"/></button>
                     <button onClick={() => onDelete(product.sku)} className="p-2 text-gray-500 hover:text-red-600 dark:hover:text-red-400"><TrashIcon className="w-4 h-4"/></button>

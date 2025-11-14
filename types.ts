@@ -32,6 +32,10 @@ export interface Product {
   price: number;
   quantity: number;
   lowStockThreshold: number;
+  // NEW: how many loose units are inside one sellable package (e.g., 20 pills per box)
+  unitsPerItem?: number;
+  // NEW: price when selling a single loose unit (may differ from pro-rated box price)
+  loosePricePerUnit?: number;
   // Optional ISO date string for product expiry. Not all deployments may have this column in Supabase.
   expiryDate?: string | null;
 }
@@ -41,6 +45,8 @@ export interface CartItem {
   name: string;
   price: number;
   quantity: number;
+  // NEW: whether the cart line is selling a whole box/package or a loose single unit
+  sale_unit?: 'box' | 'loose';
 }
 
 // Represents an item within a completed transaction
@@ -49,6 +55,8 @@ export interface TransactionItem {
   name: string; // Denormalized for easier receipt rendering
   quantitySold: number;
   pricePerItem: number; // Price at the time of sale
+  // OPTIONAL: the sale unit used for this line. Not persisted in DB by default unless migration applied.
+  saleUnit?: 'box' | 'loose';
 }
 
 export interface Transaction {

@@ -30,32 +30,37 @@ const BillingScreen: React.FC<BillingScreenProps> = ({ products, onCheckout }) =
     );
   }, [searchTerm, products]);
   
-  const addToCart = useCallback((product: Product) => {
+  const addToCart = useCallback((product: Product, saleUnit: 'box' | 'loose' = 'box') => {
+    const price = saleUnit === 'loose' ? (product.loosePricePerUnit || product.price) : product.price;
     setCart(prevCart => {
-      const existingItem = prevCart.find(item => item.productSku === product.sku);
+      const existingItem = prevCart.find(item => item.productSku === product.sku && item.sale_unit === saleUnit);
       if (existingItem) {
+        const unitsPer = (product as any).unitsPerItem || (product as any).units_per_item || 1;
+        const maxQty = saleUnit === 'loose' ? Math.floor(product.quantity * unitsPer) : product.quantity;
         return prevCart.map(item =>
-          item.productSku === product.sku
-            ? { ...item, quantity: Math.min(product.quantity, item.quantity + 1) }
+          item.productSku === product.sku && item.sale_unit === saleUnit
+            ? { ...item, quantity: Math.min(maxQty, item.quantity + 1) }
             : item
         );
       }
-      return [...prevCart, { productSku: product.sku, name: product.name, price: product.price, quantity: 1 }];
+      return [...prevCart, { productSku: product.sku, name: product.name, price, quantity: 1, sale_unit: saleUnit }];
     });
   }, []);
 
-  const updateQuantity = useCallback((productSku: string, newQuantity: number) => {
+  const updateQuantity = useCallback((productSku: string, newQuantity: number, saleUnit: 'box' | 'loose' = 'box') => {
     const product = products.find(p => p.sku === productSku);
     if (!product) return;
     
-    const clampedQuantity = Math.max(0, Math.min(product.quantity, newQuantity));
+    const unitsPer = (product as any).unitsPerItem || (product as any).units_per_item || 1;
+    const maxQty = saleUnit === 'loose' ? Math.floor(product.quantity * unitsPer) : product.quantity;
+    const clampedQuantity = Math.max(0, Math.min(maxQty, newQuantity));
 
     setCart(prevCart => {
       if (clampedQuantity === 0) {
-        return prevCart.filter(item => item.productSku !== productSku);
+        return prevCart.filter(item => item.productSku !== productSku || item.sale_unit !== saleUnit);
       }
       return prevCart.map(item =>
-        item.productSku === productSku ? { ...item, quantity: clampedQuantity } : item
+        item.productSku === productSku && item.sale_unit === saleUnit ? { ...item, quantity: clampedQuantity } : item
       );
     });
   }, [products]);
@@ -125,15 +130,35 @@ const BillingScreen: React.FC<BillingScreenProps> = ({ products, onCheckout }) =
               <div className="pr-2">
                 {filteredProducts.length > 0 ? (
                   <ul className="divide-y divide-gray-200 dark:divide-gray-700">
-                    {filteredProducts.map(p => (
-                      <li key={p.sku} className="p-3 flex justify-between items-center hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md">
-                        <div>
-                          <p className="font-medium">{p.name}</p>
-                          <p className="text-sm text-gray-500 dark:text-gray-400">{p.sku} | Rs {p.price.toFixed(2)} | <span className="font-semibold">In Stock: {p.quantity}</span></p>
-                        </div>
-                        <button onClick={() => addToCart(p)} className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 text-sm font-semibold">Add</button>
-                      </li>
-                    ))}
+                    {filteredProducts.map(p => {
+                      const unitsPer = (p as any).unitsPerItem || (p as any).units_per_item || 1;
+                      const loosePricePerUnit = (p as any).loosePricePerUnit || (p as any).loose_price_per_unit || 0;
+                      const hasLooseOption = unitsPer > 1 && loosePricePerUnit > 0;
+                      return (
+                        <li key={p.sku} className="p-3 flex justify-between items-center hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md">
+                          <div>
+                            <p className="font-medium">{p.name}</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">{p.sku} | Rs {p.price.toFixed(2)}{unitsPer > 1 ? ` (${unitsPer}/box)` : ''} | <span className="font-semibold">In Stock: {p.quantity}</span></p>
+                          </div>
+                          <div className="flex gap-2">
+                            <button 
+                              onClick={() => addToCart(p, 'box')} 
+                              className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 text-sm font-semibold"
+                            >
+                              {unitsPer > 1 ? 'Add Box' : 'Add'}
+                            </button>
+                            {hasLooseOption && (
+                              <button 
+                                onClick={() => addToCart(p, 'loose')} 
+                                className="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 text-sm font-semibold"
+                              >
+                                Add Loose
+                              </button>
+                            )}
+                          </div>
+                        </li>
+                      );
+                    })}
                   </ul>
                 ) : (
                   <p className="text-gray-500 dark:text-gray-400 mt-4 text-center">No products found.</p>
@@ -150,16 +175,16 @@ const BillingScreen: React.FC<BillingScreenProps> = ({ products, onCheckout }) =
               {cart.length > 0 ? (
                 <ul className="divide-y divide-gray-200 dark:divide-gray-700">
                   {cart.map(item => (
-                    <li key={item.productSku} className="py-3">
+                    <li key={`${item.productSku}-${item.sale_unit}`} className="py-3">
                       <div className="flex justify-between items-start">
-                        <p className="font-medium text-sm w-4/6">{item.name}</p>
+                        <p className="font-medium text-sm w-4/6">{item.name} {item.sale_unit === 'loose' ? '(Loose)' : ''}</p>
                         <p className="text-sm font-semibold">Rs {(item.price * item.quantity).toFixed(2)}</p>
                       </div>
                       <div className="flex items-center mt-2">
                         <span className="text-xs text-gray-500 dark:text-gray-400 mr-2">Qty:</span>
-                        <button onClick={() => updateQuantity(item.productSku, item.quantity - 1)} className="px-2 py-0.5 border dark:border-gray-600 rounded-l-md hover:bg-gray-100 dark:hover:bg-gray-700">-</button>
-                        <input type="number" value={item.quantity} onChange={(e) => updateQuantity(item.productSku, parseInt(e.target.value) || 0)} className="w-12 text-center border-t border-b dark:border-gray-600 bg-transparent"/>
-                        <button onClick={() => updateQuantity(item.productSku, item.quantity + 1)} className="px-2 py-0.5 border dark:border-gray-600 rounded-r-md hover:bg-gray-100 dark:hover:bg-gray-700">+</button>
+                        <button onClick={() => updateQuantity(item.productSku, item.quantity - 1, item.sale_unit)} className="px-2 py-0.5 border dark:border-gray-600 rounded-l-md hover:bg-gray-100 dark:hover:bg-gray-700">-</button>
+                        <input type="number" value={item.quantity} onChange={(e) => updateQuantity(item.productSku, parseInt(e.target.value) || 0, item.sale_unit)} className="w-12 text-center border-t border-b dark:border-gray-600 bg-transparent"/>
+                        <button onClick={() => updateQuantity(item.productSku, item.quantity + 1, item.sale_unit)} className="px-2 py-0.5 border dark:border-gray-600 rounded-r-md hover:bg-gray-100 dark:hover:bg-gray-700">+</button>
                       </div>
                     </li>
                   ))}
