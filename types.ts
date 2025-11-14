@@ -1,4 +1,4 @@
-export type View = 'Dashboard' | 'Products' | 'Billing' | 'Analytics' | 'Khata';
+export type View = 'Dashboard' | 'Products' | 'Billing' | 'Analytics' | 'Khata' | 'Transactions';
 export type Theme = 'light' | 'dark';
 
 export type ContactType = 'customer' | 'supplier';

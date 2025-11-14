@@ -13,7 +13,7 @@ interface HeaderProps {
   onSignOut: () => void;
 }
 
-const NAV_ITEMS: View[] = ['Dashboard', 'Products', 'Billing', 'Analytics', 'Khata'];
+const NAV_ITEMS: View[] = ['Dashboard', 'Products', 'Billing', 'Analytics', 'Khata', 'Transactions'];
 
 // FIX: Changed React.ReactNode to React.ReactElement for better type inference with React.cloneElement.
 // FIX: Further specified the props for React.ReactElement to include className. This resolves the type error with React.cloneElement.
@@ -22,7 +22,8 @@ const VIEW_ICONS: { [key in View]: React.ReactElement<{ className?: string }> } 
     Products: <PackageIcon className="w-5 h-5 mr-2" />,
     Billing: <ShoppingCartIcon className="w-5 h-5 mr-2" />,
     Analytics: <ChartBarIcon className="w-5 h-5 mr-2" />,
-    Khata: <BookOpenIcon className="w-5 h-5 mr-2" />, // You can replace this with a more appropriate icon
+    Khata: <BookOpenIcon className="w-5 h-5 mr-2" />,
+    Transactions: <ChartBarIcon className="w-5 h-5 mr-2" />,
 };
 
 const Header: React.FC<HeaderProps> = ({ onViewChange, currentView, theme, onThemeToggle, onSignOut }) => {

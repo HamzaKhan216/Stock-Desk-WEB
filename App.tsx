@@ -6,6 +6,7 @@ import DashboardScreen, { AnalyticsScreen } from './components/DashboardScreen';
 import BillingScreen from './components/BillingScreen';
 import ProductsScreen from './components/InventoryScreen';
 import KhataScreen from './components/KhataScreen';
+import TransactionScreen from './components/TransactionScreen';
 import AiAssistant from './components/AiAssistant';
 import { supabase } from './supabaseClient';
 import type { Session } from '@supabase/supabase-js';
@@ -397,6 +398,35 @@ const App: React.FC = () => {
     setContacts([]);
   };
 
+  const handleDeleteTransaction = async (transactionId: number) => {
+    if (!session) return;
+
+    const { error: itemsError } = await supabase
+      .from('transaction_items')
+      .delete()
+      .match({ transaction_id: transactionId });
+
+    if (itemsError) {
+      console.error('Error deleting transaction items:', itemsError.message);
+      alert('Failed to delete transaction items');
+      return;
+    }
+
+    const { error: transactionError } = await supabase
+      .from('transactions')
+      .delete()
+      .match({ id: transactionId, user_id: session.user.id });
+
+    if (transactionError) {
+      console.error('Error deleting transaction:', transactionError.message);
+      alert('Failed to delete transaction');
+    } else {
+      setTransactions(prev => prev.filter(t => t.id !== transactionId));
+      alert('Transaction deleted successfully');
+      await fetchDashboardMetrics();
+    }
+  };
+
   const renderView = () => {
     switch (currentView) {
       case 'Dashboard':
@@ -425,6 +455,12 @@ const App: React.FC = () => {
         return <AnalyticsScreen transactions={transactions} products={products} />;
       case 'Khata':
         return <KhataScreen />;
+      case 'Transactions':
+        return <TransactionScreen 
+                 transactions={transactions}
+                 contacts={contacts}
+                 onDelete={handleDeleteTransaction}
+               />;
       default:
         return <div className="p-8 text-center"><h1 className="text-2xl font-bold">Welcome to {currentView}</h1></div>;
     }
