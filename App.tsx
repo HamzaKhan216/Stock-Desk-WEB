@@ -52,6 +52,10 @@ const App: React.FC = () => {
   const [productPage, setProductPage] = useState(1);
   const [totalProducts, setTotalProducts] = useState(0);
   const PRODUCTS_PER_PAGE = 50;
+  const [dashboardMetrics, setDashboardMetrics] = useState({
+    lowStockCount: 0,
+    nearExpiryCount: 0,
+  });
   
   // If supabase is not configured, show instructions.
   if (!supabase) {
@@ -63,6 +67,25 @@ const App: React.FC = () => {
     root.classList.remove(theme === 'light' ? 'dark' : 'light');
     root.classList.add(theme);
   }, [theme]);
+
+  const fetchDashboardMetrics = async () => {
+    if (!session) return;
+
+    const { data: lowStockCount, error: lowStockError } = await supabase
+      .rpc('get_low_stock_count');
+
+    if (lowStockError) console.error('Error fetching low stock count:', lowStockError);
+
+    const { data: nearExpiryCount, error: nearExpiryError } = await supabase
+      .rpc('get_near_expiry_count');
+      
+    if (nearExpiryError) console.error('Error fetching near expiry count:', nearExpiryError);
+
+    setDashboardMetrics({
+      lowStockCount: lowStockCount || 0,
+      nearExpiryCount: nearExpiryCount || 0,
+    });
+  };
 
   const fetchData = async (page: number = 1) => {
       if(!session) return;
@@ -149,6 +172,7 @@ const App: React.FC = () => {
   useEffect(() => {
     if(session) {
       fetchData(productPage);
+      fetchDashboardMetrics();
     }
   }, [session, productPage]);
 
@@ -247,6 +271,7 @@ const App: React.FC = () => {
     }
 
     await fetchData(productPage);
+    await fetchDashboardMetrics();
 
     const newTransaction: Transaction = {
       id: transactionData.id,
@@ -282,7 +307,10 @@ const App: React.FC = () => {
         console.error("Error updating product:", error.message);
         alert(`Failed to update product: ${error.message}`);
     }
-    else await fetchData(productPage);
+    else {
+        await fetchData(productPage);
+        await fetchDashboardMetrics();
+    }
 
     // If DB does not support expiry column, persist it locally so it survives reloads on this browser
     if (!supportsExpiry) {
@@ -323,6 +351,7 @@ const App: React.FC = () => {
         }
     } else {
         await fetchData(productPage);
+        await fetchDashboardMetrics();
     }
 
     // If DB doesn't support expiry, save it in localStorage as a fallback
@@ -345,7 +374,10 @@ const App: React.FC = () => {
         console.error("Error deleting product:", error.message);
         alert(`Failed to delete product: ${error.message}`);
     }
-    else await fetchData(productPage);
+    else {
+        await fetchData(productPage);
+        await fetchDashboardMetrics();
+    }
     // Clean local expiry cache when product deleted
     try {
       const map = JSON.parse(localStorage.getItem('expiry_dates') || '{}');
@@ -368,7 +400,13 @@ const App: React.FC = () => {
   const renderView = () => {
     switch (currentView) {
       case 'Dashboard':
-        return <DashboardScreen products={products} transactions={transactions} />;
+        return <DashboardScreen 
+                 products={products}
+                 totalProducts={totalProducts}
+                 lowStockCount={dashboardMetrics.lowStockCount}
+                 nearExpiryCount={dashboardMetrics.nearExpiryCount}
+                 transactions={transactions} 
+               />;
       case 'Billing':
         return <BillingScreen products={products} onCheckout={handleCheckout} />;
       case 'Products':

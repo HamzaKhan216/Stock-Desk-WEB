@@ -19,21 +19,19 @@ const StatCard: React.FC<{ title: string; value: string | number; icon: React.Re
 // --- DashboardScreen Component (Default Export) ---
 interface DashboardScreenProps {
   products: Product[];
+  totalProducts: number;
+  lowStockCount: number;
+  nearExpiryCount: number;
   transactions: Transaction[];
 }
 
-const DashboardScreen: React.FC<DashboardScreenProps> = ({ products, transactions }) => {
-    const totalProducts = products.length;
-    const lowStockItems = products.filter(p => p.quantity <= p.lowStockThreshold).length;
-    // Near expiry: products with an expiryDate within the next X days
-    const EXPIRY_THRESHOLD_DAYS = 7;
-    const nearExpiryItems = products.filter(p => {
-        if (!p.expiryDate) return false;
-        const d = new Date(p.expiryDate);
-        const diffMs = d.getTime() - Date.now();
-        const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-        return diffDays >= 0 && diffDays <= EXPIRY_THRESHOLD_DAYS;
-    }).length;
+const DashboardScreen: React.FC<DashboardScreenProps> = ({ 
+  products, 
+  totalProducts, 
+  lowStockCount, 
+  nearExpiryCount, 
+  transactions 
+}) => {
     const totalRevenue = transactions.reduce((sum, t) => sum + t.total, 0);
     const totalSales = transactions.length;
 
@@ -73,15 +71,15 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ products, transaction
                 />
                 <StatCard 
                     title="Low Stock Items" 
-                    value={lowStockItems} 
+                    value={lowStockCount} 
                     icon={<AlertTriangleIcon className="w-6 h-6 text-white"/>} 
-                    color={lowStockItems > 0 ? "bg-red-500" : "bg-yellow-500"}
+                    color={lowStockCount > 0 ? "bg-red-500" : "bg-yellow-500"}
                 />
                 <StatCard
-                    title={`Near Expiry (${EXPIRY_THRESHOLD_DAYS}d)`}
-                    value={nearExpiryItems}
+                    title="Near Expiry (7d)"
+                    value={nearExpiryCount}
                     icon={<PackageIcon className="w-6 h-6 text-white"/>}
-                    color={nearExpiryItems > 0 ? 'bg-red-500' : 'bg-green-400'}
+                    color={nearExpiryCount > 0 ? 'bg-red-500' : 'bg-green-400'}
                 />
             </div>
 
