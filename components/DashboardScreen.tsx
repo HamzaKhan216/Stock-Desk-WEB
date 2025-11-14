@@ -23,6 +23,7 @@ interface DashboardScreenProps {
   lowStockCount: number;
   nearExpiryCount: number;
   transactions: Transaction[];
+  allProductCosts?: Record<string, number>;
 }
 
 const DashboardScreen: React.FC<DashboardScreenProps> = ({ 
@@ -31,17 +32,27 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({
   lowStockCount, 
   nearExpiryCount, 
   transactions 
+  , allProductCosts
 }) => {
     const totalRevenue = transactions.reduce((sum, t) => sum + t.total, 0);
     const totalSales = transactions.length;
 
-    // Calculate total cost of goods sold (COGS) using product.costPrice and transaction items
-    const totalCost = transactions.reduce((sum, t) => {
-        return t.items.reduce((itemSum, item) => {
-            const product = products.find(p => p.sku === item.productSku);
-            const costPrice = product ? product.costPrice : 0;
+    // Build a map of sku -> costPrice. Prefer the full-cost map if provided (fetched without pagination),
+    // otherwise fall back to the (paginated) products array.
+    const costMap: Record<string, number> = allProductCosts && Object.keys(allProductCosts).length > 0
+        ? allProductCosts
+        : products.reduce((m, p) => {
+            m[p.sku] = Number(p.costPrice || 0);
+            return m;
+        }, {} as Record<string, number>);
+
+    // Calculate total cost of goods sold (COGS) correctly by summing each item's quantity * costPrice.
+    const totalCost = transactions.reduce((txAcc, t) => {
+        const txTotal = t.items.reduce((itemSum, item) => {
+            const costPrice = costMap[item.productSku] ?? 0;
             return itemSum + (item.quantitySold * costPrice);
-        }, sum);
+        }, 0);
+        return txAcc + txTotal;
     }, 0);
 
     const totalProfit = totalRevenue - totalCost;

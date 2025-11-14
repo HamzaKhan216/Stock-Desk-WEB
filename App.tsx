@@ -46,6 +46,7 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [currentView, setCurrentView] = useState<View>('Dashboard');
   const [products, setProducts] = useState<Product[]>([]);
+  const [productCostMap, setProductCostMap] = useState<Record<string, number>>({});
   const [supportsExpiry, setSupportsExpiry] = useState<boolean>(true);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -145,6 +146,21 @@ const App: React.FC = () => {
           }))
         }));
         setTransactions(formattedTransactions);
+      }
+
+      // Also fetch a lightweight map of sku -> cost_price for ALL products so dashboard metrics (COGS/profit) are accurate
+      const { data: allProductsCostData, error: allProductsCostError } = await supabase
+        .from('products')
+        .select('sku, cost_price');
+
+      if (allProductsCostError) {
+        console.error('Error fetching product cost map:', allProductsCostError);
+      } else if (Array.isArray(allProductsCostData)) {
+        const map: Record<string, number> = {};
+        allProductsCostData.forEach((p: any) => {
+          map[p.sku] = Number(p.cost_price || 0);
+        });
+        setProductCostMap(map);
       }
 
       // Fetch contacts (customers and suppliers)
@@ -381,7 +397,7 @@ const App: React.FC = () => {
     }
     // Clean local expiry cache when product deleted
     try {
-      const map = JSON.parse(localStorage.getItem('expiry_dates') || '{}');
+       const map = JSON.parse(localStorage.getItem('expiry_dates') || '{}');
       if (map[sku]) {
         delete map[sku];
         localStorage.setItem('expiry_dates', JSON.stringify(map));
@@ -433,9 +449,10 @@ const App: React.FC = () => {
         return <DashboardScreen 
                  products={products}
                  totalProducts={totalProducts}
-                 lowStockCount={dashboardMetrics.lowStockCount}
-                 nearExpiryCount={dashboardMetrics.nearExpiryCount}
-                 transactions={transactions} 
+                   lowStockCount={dashboardMetrics.lowStockCount}
+                   nearExpiryCount={dashboardMetrics.nearExpiryCount}
+                   transactions={transactions}
+                   allProductCosts={productCostMap}
                />;
       case 'Billing':
         return <BillingScreen products={products} onCheckout={handleCheckout} />;
